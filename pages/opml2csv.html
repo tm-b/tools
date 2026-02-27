@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OPML to CSV Converter (title, xmlUrl)</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f5f5f5;
+      color: #222;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+    }
+    .panel {
+      background: #fff;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+    input[type="file"] {
+      margin-bottom: 0.5rem;
+    }
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      box-sizing: border-box;
+      font-family: monospace;
+      font-size: 0.9rem;
+      padding: 0.5rem;
+      border-radius: 3px;
+      border: 1px solid #ccc;
+      resize: vertical;
+    }
+    button, .button-link {
+      display: inline-block;
+      padding: 0.4rem 0.8rem;
+      margin-top: 0.5rem;
+      margin-right: 0.5rem;
+      font-size: 0.9rem;
+      border-radius: 3px;
+      border: 1px solid #0d6efd;
+      background: #0d6efd;
+      color: #fff;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button:hover, .button-link:hover {
+      background: #0b5ed7;
+      border-color: #0b5ed7;
+    }
+    .button-link.disabled {
+      opacity: 0.5;
+      cursor: default;
+      pointer-events: none;
+    }
+    #status {
+      display: inline-block;
+      margin-left: 0.5rem;
+      font-size: 0.85rem;
+      color: #555;
+    }
+    .hint {
+      font-size: 0.85rem;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>OPML to CSV Converter (title, xmlUrl)</h1>
+
+  <div class="panel">
+    <label for="fileInput">1. Load OPML file</label>
+    <input type="file" id="fileInput" accept=".opml,.xml">
+    <div class="hint">…or paste OPML content manually:</div>
+    <textarea id="opmlInput" placeholder="Paste OPML here..."></textarea>
+    <br>
+    <button id="convertBtn">Convert to CSV</button>
+    <span id="status"></span>
+  </div>
+
+  <div class="panel">
+    <label for="csvOutput">2. CSV output (title,xmlUrl)</label>
+    <textarea id="csvOutput" readonly placeholder="CSV will appear here..."></textarea>
+    <br>
+    <a id="downloadLink" class="button-link disabled" download="feeds.csv">Download CSV</a>
+  </div>
+
+  <script>
+    (function () {
+      const fileInput    = document.getElementById('fileInput');
+      const opmlInput    = document.getElementById('opmlInput');
+      const convertBtn   = document.getElementById('convertBtn');
+      const csvOutput    = document.getElementById('csvOutput');
+      const downloadLink = document.getElementById('downloadLink');
+      const statusSpan   = document.getElementById('status');
+
+      let currentDownloadUrl = null;
+
+      // Load file content into the textarea
+      fileInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          opmlInput.value = e.target.result;
+          statusSpan.textContent = `Loaded file: ${file.name}`;
+        };
+        reader.onerror = function () {
+          statusSpan.textContent = 'Error reading file.';
+        };
+        reader.readAsText(file);
+      });
+
+      // Convert OPML to CSV
+      convertBtn.addEventListener('click', function () {
+        const xmlString = opmlInput.value.trim();
+        if (!xmlString) {
+          alert('Please load or paste OPML content first.');
+          return;
+        }
+
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(xmlString, 'text/xml');
+
+          // Check for parse errors
+          const parseError = doc.getElementsByTagName('parsererror')[0];
+          if (parseError) {
+            throw new Error('Invalid XML/OPML: ' + (parseError.textContent || '').trim());
+          }
+
+          // Find all outline elements with xmlUrl attribute
+          const outlines = Array.from(doc.getElementsByTagName('outline'))
+            .filter(el => el.hasAttribute('xmlUrl'));
+
+          if (outlines.length === 0) {
+            statusSpan.textContent = 'No <outline> elements with xmlUrl found.';
+          } else {
+            statusSpan.textContent = `Found ${outlines.length} feed(s).`;
+          }
+
+          // Prepare CSV rows: header + data
+          const rows = [['title', 'xmlUrl']];
+
+          outlines.forEach(outline => {
+            const title = outline.getAttribute('title') ||
+                          outline.getAttribute('text')  || '';
+            const url   = outline.getAttribute('xmlUrl') || '';
+            rows.push([title, url]);
+          });
+
+          // Basic CSV escaping
+          function csvEscape(value) {
+            if (value == null) return '';
+            const str = String(value);
+            if (/[",\n\r]/.test(str)) {
+              return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+          }
+
+          const csvContent = rows
+            .map(row => row.map(csvEscape).join(','))
+            .join('\r\n');
+
+          csvOutput.value = csvContent || '';
+
+          // Prepare download link
+          if (currentDownloadUrl) {
+            URL.revokeObjectURL(currentDownloadUrl);
+            currentDownloadUrl = null;
+          }
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          currentDownloadUrl = URL.createObjectURL(blob);
+
+          downloadLink.href = currentDownloadUrl;
+          downloadLink.classList.remove('disabled');
+          downloadLink.textContent = `Download CSV (${Math.max(rows.length - 1, 0)} item${rows.length - 1 === 1 ? '' : 's'})`;
+        } catch (err) {
+          csvOutput.value = '';
+          downloadLink.classList.add('disabled');
+          if (currentDownloadUrl) {
+            URL.revokeObjectURL(currentDownloadUrl);
+            currentDownloadUrl = null;
+          }
+          statusSpan.textContent = 'Error: ' + err.message;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,418 @@
+<!--
+	Version 1.0.2 (26/02/2024)
+    MIT License
+
+    Copyright (c) 2023 Daniel BP
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+-->
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <title>Bookmarks to Markdown</title>
+  <meta name="description" content="Bookmarks to MD">
+  <meta name="author" content="Daniel BP">
+  <style>
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f9f9f9;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    color: #4A90E2;
+    text-align: center;
+}
+
+h3 {
+    color: #333;
+}
+
+p {
+    font-size: 14pt;
+}
+
+.outputs {
+    font-size: 12pt;
+}
+
+table {
+    font-size: 12pt;
+}
+
+textarea {
+    font-family: 'Courier New', monospace;
+    width: 100%;
+    height: 512px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+input[type="button"] {
+    background-color: #4A90E2;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+input[type="button"]:hover {
+    background-color: #357ABD;
+}
+
+.columns {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.columnBlock {
+    flex: 1;
+    margin: 0 10px;
+    background-color: #fff;
+    border-radius: 5px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.hidden {
+    display: none;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+  </style>
+	<!-- Your style-sheets go here -->
+			
+	<!-- End of your page style-sheets-->
+</head>
+<body>
+	<div>
+	<h1>Bookmarks to Markdown</h1>
+		<center>
+          <a href="https://github.com/danpeig/bookmarks2md" target="_blank">
+              <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub Logo" style="width: 40px; height: 40px;">
+          </a>
+		</center>
+		<div class="columns">
+					<div class="columnBlock"><h3>1. Select and load one or more HTML bookmark files</h3>
+						<input type="file" id="fileinput" multiple="">&nbsp;
+						<input type="button" value="Reload the files" onclick="document.getElementById('fileinput').dispatchEvent(eVent);">
+					</div>
+					<div class="columnBlock"><h3>2. Convert the bookmarks</h3>
+						<input type="button" value="Convert" onclick="processHTML();">
+						<ul>
+							<li>Source files: <span id="fileCount" class="bold">N/A</span></li>
+							<li>Folders: <span id="folderCount" class="bold">N/A</span></li>
+							<li>Bookmarks: <span id="bookmarkCount" class="bold">N/A</span></li>
+						</ul>
+					</div>
+					<div class="columnBlock"><h3>3. Export the Markdown</h3>
+					<input type="button" value="Save as a file" onclick="exportMD();">
+					<input type="button" value="Copy to clipboard" onclick="copyMD();">
+					</div>
+		</div>
+	</div>
+	<br><br>
+		<div class="hidden" id="b2mdMDTitle">
+			<h1 id="b2mdMDHead">Final MD Markup</h1>
+			<hr>
+			<textarea id="b2mdMD" class="outputs"></textarea>
+			<hr>
+		</div>
+		<div class="hidden" id="b2mdOutputsTitle">
+			<h1 id="b2mdOutputHead">Source HTML bookmarks</h1>
+			<hr>
+			<div id="b2mdOutputs" class="outputs"></div>
+		</div>
+<script>
+// JavaScript extra debug code part 1
+//--------------------------------------------------------------------------------------------------------
+"use strict"; //Prevents the use of undeclared variables
+console.time("Runtime"); //Start the script timer
+//--------------------------------------------------------------------------------------------------------
+</script>
+
+<script>
+//
+//-------------------------------------------------------------------------------------------------------------
+// BOOKMARKS TO MD CONVERSION ENGINE
+//-------------------------------------------------------------------------------------------------------------
+// This Software was Developed by Daniel Brooke Peig
+// In case of any doubts please contact the developer at www.danbp.org
+// Copyright (c) 2023 Daniel Brooke Peig
+//-------------------------------------------------------------------------------------------------------------
+//
+//
+//
+//Turn on for verbose output for debug purposes
+let debug = false;
+
+/**
+ * Converts the Bookmarks Notation to MarkDown
+ * Please note that this function requires a DOM object and functions to work
+ * @param {object} source - The source DOM element containing the DT/DL tags
+ * @param {int} level - The depth level of the block
+ * @returns {string} - Formatted MD
+ */
+function b2md(source, level = 0) {
+  dest = "";
+  //Get links and titles first
+  for (let index in source.children) {
+    //Title
+    if (source.children[index].tagName == "H1") {
+      if (debug) console.log("Title: " + source.children[index].innerHTML);
+      dest += "# " + source.children[index].innerHTML + "\n";
+      //dest += "----\n";
+    }
+    //Links
+    else if (source.children[index].tagName == "DT") {
+      if (source.children[index].childElementCount > 0) {
+        if (source.children[index].children[0].tagName == "A") {
+          if (debug) console.log("Link: " + source.children[index].children[0].innerHTML);
+          dest +=
+            indent(level) +
+            "[" +
+            source.children[index].children[0].innerHTML +
+            "](" +
+            source.children[index].children[0].href +
+            ")\n";
+        }
+      }
+    }
+  }
+  //Get sub-folders
+  let foundHeader = false;
+  for (let index in source.children) {
+    if (source.children[index].tagName == "DT") {
+      //This is a sub-folder folder header
+      if (source.children[index].children[0].tagName == "H3") {
+        if (debug)
+          console.log("Sub-folder level " + (level + 1) + " header: " + source.children[index].children[0].innerHTML);
+        dest += indentHeader(level) + source.children[index].children[0].innerHTML + "\n";
+        foundHeader = true;
+      }
+      //This sub-folder has contents
+      if (source.children[index].childElementCount > 1)
+        if (source.children[index].children[1].tagName == "DL") {
+          if (foundHeader == true) {
+            level++;
+            foundHeader = false;
+          }
+          if (debug) console.log("Getting internal content from level " + level);
+          // Let's get the content from the sub-folder
+          dest += b2md(source.children[index].children[1], level);
+          level--;
+        }
+    }
+    //This is just a container, move down
+    if (source.children[index].tagName == "DL") {
+      if (debug) console.log("Nothing to do in this level, let's go to the next...");
+      dest += b2md(source.children[index], level);
+    }
+  }
+  return dest;
+}
+
+/**
+ * Creates indentation for links
+ * @param {int} level - The depth level of the block
+ * @returns {string} - Formatted indentation markup
+ */
+function indent(level) {
+  indentation = "";
+  for (i = 0; i < level; i++) indentation += "";
+  return indentation + "- ";
+}
+
+/**
+ * Creates indentation for headers
+ * @param {int} level - The depth level of the block
+ * @returns {string} - Formatted indentation markup
+ */
+function indentHeader(level) {
+  indentation = "##";
+  for (i = 0; i < level; i++) indentation += "#";
+  return indentation + " ";
+}
+</script>
+<script>
+//
+//-------------------------------------------------------------------------------------------------------------
+// USER INTERFACE FOR THE PAGE
+//-------------------------------------------------------------------------------------------------------------
+// This Software was Developed by Daniel Brooke Peig
+// In case of any doubts please contact the developer at www.danbp.org
+// Copyright (c) 2023 Daniel Brooke Peig
+//-------------------------------------------------------------------------------------------------------------
+//
+//
+//
+var originalTitle = document.title;
+var fileCount = 0; //Keep track of the amount of files
+var processedReports = false; //Check if the report was processed or not
+var exportTitle = "";
+
+function readMultiFile(evt) {
+
+	//Clear the statistics
+	document.getElementById('fileCount').innerHTML= "N/A";
+	document.getElementById('folderCount').innerHTML= "N/A";
+	document.getElementById('bookmarkCount').innerHTML= "N/A";
+
+	//Clear the HTML output placeholder
+	document.getElementById('b2mdOutputs').innerHTML= "";
+	document.getElementById('b2mdOutputsTitle').className = "hidden";
+	document.getElementById('b2mdOutputHead').innerHTML = "Source HTML bookmarks";
+
+	//Clear the output placeholder
+	document.getElementById('b2mdMD').innerHTML= "";
+	document.getElementById('b2mdMDTitle').className = "hidden";
+	document.getElementById('b2mdMDHead').innerHTML = "Final Markdown";
+	
+	
+	//Count the files
+	fileCount = evt.target.files.length;
+	
+	//Tracks the file index
+	var fileIndex = 0;
+	
+	//Files object
+	var files = evt.target.files;
+	
+	if(fileCount > 16) alert("Maximum 16 files at once.")
+	else {
+		if (files) {
+		//Display the output box
+		document.getElementById('b2mdOutputsTitle').className = "";
+		
+			for (var i=0, f; f=files[i]; i++) {
+				  var r = new FileReader();
+				  if(exportTitle == "") exportTitle = f.name;
+				r.onload = (function(f) {
+					return function(e) {
+						var contents = e.target.result;
+						fileIndex++;
+					
+						//Create an object holder for the file and then append to the main div object
+						var outputDiv = document.createElement('div');
+						outputDiv.id = 'b2mdOutput'+fileIndex;
+						outputDiv.innerHTML = contents;
+						outputDiv.className = "reportBlock";
+						document.getElementById('b2mdOutputs').appendChild(outputDiv);
+						var outputHR = document.createElement('hr');
+						outputHR.className = "noprint";
+						document.getElementById('b2mdOutputs').appendChild(outputHR);
+		
+					};
+				})(f);
+
+				r.readAsText(f);
+			}   
+		} else {
+			  alert("Failed to load files.");
+			  fileCount = 0;
+		}
+	}
+	processedSources = false;
+  }
+// Load the file
+document.getElementById('fileinput').addEventListener('change', readMultiFile, false);
+
+// Create the change event
+var eVent = new Event('change');
+
+function processHTML(){
+
+//Process each block(file)
+for(var bIndex=1; bIndex<=fileCount; bIndex++) {
+
+//Set the processed reports flag
+processedSources = false;
+
+if(document.getElementById('b2mdOutput'+bIndex).innerHTML.length < 200) {alert("No file contents loaded. Please reload the file.");}
+else if(document.getElementById('b2mdOutput'+bIndex).innerHTML.indexOf("Bookmarks")<0){
+	alert("Sorry, this is not a valid bookmark export file.");
+}
+else if(document.getElementById('b2mdOutput'+bIndex).innerHTML.indexOf("b2md") > 0){
+	if(bIndex == 1) alert("This document was already converted. Please reload the file if you want to convert it again.");
+}
+//Performs the conversions
+else {
+	document.getElementById('b2mdMD').innerHTML += b2md(document.getElementById('b2mdOutput'+bIndex))
+	//Display the output box
+	document.getElementById('b2mdMDTitle').className = "";
+
+	//Calculates statistics	
+	document.getElementById('fileCount').innerHTML= fileCount;
+	let folderCount = 0;
+	let bookmarkCount = 0;
+	let lines = document.getElementById('b2mdMD').innerHTML.split("\n");
+	for (line of lines){
+		if (line.search(/- \[/gm) != -1) bookmarkCount++;
+		if (line.search(/\#\#/gm) != -1) folderCount++;
+	}
+	document.getElementById('folderCount').innerHTML= folderCount;
+	document.getElementById('bookmarkCount').innerHTML= bookmarkCount;
+
+	} //End of else block (after error check)
+} //End of block loop
+
+
+} //End of processHTML
+
+function exportMD(){
+	const link = document.createElement("a");
+         const content = document.getElementById("b2mdMD").innerHTML;
+         const file = new Blob([content], { type: 'text/plain' });
+         link.href = URL.createObjectURL(file);
+         link.download = exportTitle.replace(".html",".md").replace(".htm",".md");
+         link.click();
+         URL.revokeObjectURL(link.href);
+}
+
+function copyMD() {
+   // Copy the text inside the text field
+  navigator.clipboard.writeText(document.getElementById("b2mdMD").innerHTML);
+}
+
+</script>
+<!-- End of your JavaScript code -->
+
+
+<script>
+// JavaScript extra debug code part 2
+//--------------------------------------------------------------------------------------------------------
+console.log("Developed by Daniel Brooke Peig (www.danbp.org)"); //Add final notice
+console.timeEnd("Runtime"); //Stop the script timer
+//--------------------------------------------------------------------------------------------------------
+</script>
+
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97178a27de583aba',t:'MTc1NTU4NDM2OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><iframe height="1" width="1" style="position: absolute; top: 0px; left: 0px; border: medium; visibility: hidden;"></iframe>
+
+</body></html>
